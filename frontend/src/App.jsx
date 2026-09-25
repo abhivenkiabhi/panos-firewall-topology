@@ -6,6 +6,7 @@ import InspectorDrawer from './components/InspectorDrawer';
 import ReachabilitySimulator from './components/ReachabilitySimulator';
 import ChatAssistantDrawer from './components/ChatAssistantDrawer';
 import LogStreamViewer from './components/LogStreamViewer';
+import HierarchyTreePanel from './components/HierarchyTreePanel';
 
 export default function App() {
   const [revision, setRevision] = useState('v2'); // 'v1' | 'v2' | 'diff'
@@ -17,6 +18,7 @@ export default function App() {
   const [isSimulatorOpen, setIsSimulatorOpen] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isLogsOpen, setIsLogsOpen] = useState(false);
+  const [isTreeOpen, setIsTreeOpen] = useState(false);
 
   // Data states
   const [topologyData, setTopologyData] = useState(null);
@@ -96,6 +98,8 @@ export default function App() {
         onOpenSimulator={() => setIsSimulatorOpen(true)}
         onOpenChat={() => setIsChatOpen(true)}
         onOpenLogs={() => setIsLogsOpen(true)}
+        onOpenTree={() => setIsTreeOpen(!isTreeOpen)}
+        isTreeOpen={isTreeOpen}
       />
 
       {/* Diff Banner when in Diff Mode */}
@@ -119,6 +123,18 @@ export default function App() {
           onClearSimulation={() => setSimulationResult(null)}
         />
       </main>
+
+      {/* Slide-over PAN-OS Hierarchy Tree Panel */}
+      <HierarchyTreePanel
+        isOpen={isTreeOpen}
+        onClose={() => setIsTreeOpen(false)}
+        topologyData={topologyData}
+        selectedNode={selectedNode}
+        onSelectNode={(node) => {
+          setSelectedNode(node);
+        }}
+        revision={revision}
+      />
 
       {/* Slide-out Inspector Drawer */}
       {selectedNode && (

@@ -39,7 +39,22 @@ An interactive **Next-Generation Firewall (NGFW) Topology Viewer, Commit Diff Tr
    * **Blast Radius Mode**: Select any firewall node or workload to instantly isolate 1-hop and 2-hop connected network dependencies, automatically dimming unrelated elements and pulsing connected links.
    * **Zero-Trust Exposure Profiler**: Computes attack surface risk (`CRITICAL`, `HIGH`, `MEDIUM`, `LOW`), permitted inbound ingress zones, outbound egress targets, and authorized App-IDs.
 
-7. **Autonomous Multi-Tool ReAct Agent (Root Cause Analysis & Remediation)**:
+7. **Structured 5-Tier Security Hierarchy**:
+   * **Left-to-Right Security Progression**: Organizes network architecture into 5 distinct, intuitive security tiers:
+     * **Tier 1: External / WAN Ingress** (Internet ISP Gateway, AWS Cloud IPsec VPN, Chicago Branch IPsec VPN)
+     * **Tier 2: NGFW Enforcement Core & VR** (PA-3410 Firewall Appliance & Virtual Router `default` FIB engine)
+     * **Tier 3: Demilitarized Zone (DMZ)** (Public web workloads and ingress application proxies)
+     * **Tier 4: Enterprise Trust & PCI Zones** (Corporate app servers, production DBs, and isolated PCI DSS payment gateway)
+     * **Tier 5: Isolated Management Plane** (Out-of-band management interface and bastion jump host)
+   * **Hierarchical Breadcrumb Trail**: Active contextual breadcrumbs on canvas (`Firewall > Virtual Router > Zone > Subnet > Host`) for instant spatial orientation.
+   * **Hierarchy Depth Filter**: Segmented control switching between `All Tiers`, `Zones Only` (macro architecture), and `Subnets` (routing plane).
+
+8. **Interactive PAN-OS Hierarchy Tree Navigator**:
+   * Collapsible left-hand drawer detailing the full appliance containment tree:
+     $$\text{Appliance (PA-3410)} \longrightarrow \text{Virtual Router (FIB)} \longrightarrow \text{Security Zones} \longrightarrow \text{Subnets / Interfaces} \longrightarrow \text{Workloads / Hosts}$$
+   * Quick filter and instant 1-click focus that centers nodes and computes blast radius.
+
+9. **Autonomous Multi-Tool ReAct Agent (Root Cause Analysis & Remediation)**:
    * Empowers SecOps teams to ask complex, high-level questions such as:
      * *"What is happening and why did things break after CR-4910?"*
      * *"Why is Chicago branch failing to reach the payment gateway?"*
@@ -158,7 +173,8 @@ panos-firewall-topology/
     │   ├── App.jsx                # Main application view & state manager
     │   └── components/
     │       ├── Header.jsx         # PANW Flame branding & commit switcher
-    │       ├── TopologyCanvas.jsx # SVG interactive canvas with zone boundary boxes
+    │       ├── TopologyCanvas.jsx # SVG interactive canvas with 5-tier vertical columns
+    │       ├── HierarchyTreePanel.jsx # PAN-OS 5-tier appliance containment tree panel
     │       ├── InspectorDrawer.jsx# Entity inspector with PAN-OS 'set' excerpts
     │       ├── ReachabilitySimulator.jsx # Layer-7 App-ID policy test modal
     │       ├── ChatAssistantDrawer.jsx   # Strata AI assistant drawer

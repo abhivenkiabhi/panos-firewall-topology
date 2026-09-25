@@ -8,7 +8,8 @@ import {
   Terminal, 
   Activity,
   Flame,
-  Cpu
+  Cpu,
+  FolderTree
 } from 'lucide-react';
 
 export default function Header({ 
@@ -18,7 +19,9 @@ export default function Header({
   setShowTraffic,
   onOpenSimulator,
   onOpenChat,
-  onOpenLogs 
+  onOpenLogs,
+  onOpenTree,
+  isTreeOpen
 }) {
   return (
     <header className="h-16 bg-[#0b0f19] border-b border-slate-800 px-6 flex items-center justify-between select-none z-30 shadow-md">
@@ -97,6 +100,20 @@ export default function Header({
         >
           <Activity className={`w-3.5 h-3.5 ${showTraffic ? 'animate-pulse text-emerald-400' : ''}`} />
           <span>App-ID Flows</span>
+        </button>
+
+        {/* Hierarchy Tree Navigator Drawer */}
+        <button
+          onClick={onOpenTree}
+          className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all shadow-sm ${
+            isTreeOpen 
+              ? 'bg-[#fa582d]/20 border-[#fa582d] text-white shadow-[#fa582d]/20'
+              : 'bg-slate-900 hover:bg-slate-800 border-slate-700/80 text-slate-200 hover:text-white'
+          }`}
+          title="Open PAN-OS 5-Tier Containment Tree"
+        >
+          <FolderTree className="w-3.5 h-3.5 text-[#fa582d]" />
+          <span>Hierarchy Tree</span>
         </button>
 
         {/* Reachability Simulator Modal */}
