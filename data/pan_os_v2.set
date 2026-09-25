@@ -1,0 +1,86 @@
+# ====================================================================
+# Palo Alto Networks PAN-OS 11.1 Running Configuration
+# Device: PA-3410 (Hostname: PA-NGFW-CORE-01)
+# Serial: 001801000001
+# Generated via: set cli config-output-format set ; show config running
+# Snapshot: Revision V2 (CR-4910: PCI DSS Compliance & QA Decommission)
+# ====================================================================
+
+set deviceconfig system hostname PA-NGFW-CORE-01
+set deviceconfig system domain corp.paloaltonetworks.local
+set deviceconfig system timezone US/Pacific
+
+# --- Layer 3 Network Interfaces ---
+set network interface ethernet ethernet1/1 layer3 ip 203.0.113.1/24
+set network interface ethernet ethernet1/1 layer3 comment "Uplink to Public Transit / ISP-1"
+set network interface ethernet ethernet1/2 layer3 ip 192.168.10.1/24
+set network interface ethernet ethernet1/2 layer3 comment "DMZ Inbound Web Application Tier"
+set network interface ethernet ethernet1/3 layer3 ip 10.100.1.1/24
+set network interface ethernet ethernet1/3 layer3 comment "Trust Internal Corporate & App Tier"
+set network interface ethernet ethernet1/5 layer3 ip 10.200.50.1/24
+set network interface ethernet ethernet1/5 layer3 comment "PCI-DSS Cardholder Data Environment (CDE)"
+set network interface ethernet ethernet1/8 layer3 ip 10.254.1.1/24
+set network interface ethernet ethernet1/8 layer3 comment "Dedicated Out-of-Band Management"
+
+# --- Virtual Router & Routing Table ---
+set network virtual-router default interface [ ethernet1/1 ethernet1/2 ethernet1/3 ethernet1/5 ethernet1/8 ]
+set network virtual-router default routing-table ip static-route "Default-Internet-Gateway" nexthop ip-address 203.0.113.254 interface ethernet1/1 metric 10 destination 0.0.0.0/0
+set network virtual-router default routing-table ip static-route "Route-DMZ" interface ethernet1/2 destination 192.168.10.0/24
+set network virtual-router default routing-table ip static-route "Route-Trust-Internal" interface ethernet1/3 destination 10.100.1.0/24
+set network virtual-router default routing-table ip static-route "Route-PCI-CDE" interface ethernet1/5 destination 10.200.50.0/24
+
+# --- Security Zones ---
+set zone Untrust network layer3 ethernet1/1
+set zone DMZ network layer3 ethernet1/2
+set zone Trust-Internal network layer3 ethernet1/3
+set zone PCI-Cardholder network layer3 ethernet1/5
+set zone Management network layer3 ethernet1/8
+
+# --- Address Objects & Groups ---
+set address OBJ_NET_DMZ ip-netmask 192.168.10.0/24 description "DMZ Web Subnet"
+set address OBJ_NET_TRUST ip-netmask 10.100.1.0/24 description "Internal Core Subnet"
+set address OBJ_NET_PCI ip-netmask 10.200.50.0/24 description "PCI Cardholder CDE Subnet"
+set address OBJ_HOST_WEB_SRV01 ip-netmask 192.168.10.80/32 description "Production NGINX Reverse Proxy"
+set address OBJ_HOST_API_PROXY02 ip-netmask 192.168.10.85/32 description "API Gateway Ingress"
+set address OBJ_HOST_APP_SRV01 ip-netmask 10.100.1.20/32 description "Core Application Server"
+set address OBJ_HOST_DB_SRV01 ip-netmask 10.100.1.50/32 description "Production PostgreSQL Database"
+set address OBJ_HOST_PAYMENT_GW ip-netmask 10.200.50.25/32 description "PCI Tokenization & Settlement Gateway"
+set address OBJ_HOST_MGMT_BASTION ip-netmask 10.254.1.10/32 description "Engineering SSH Bastion"
+
+# --- NAT Policy Rules ---
+set rulebase nat rules "DNAT-Inbound-HTTPS" from Untrust to Untrust destination 203.0.113.80 service service-https destination-translation translated-address 192.168.10.80
+set rulebase nat rules "SNAT-Outbound-Trust" from Trust-Internal to Untrust source OBJ_NET_TRUST to-interface ethernet1/1 source-translation dynamic-ip-and-port interface-address interface ethernet1/1
+set rulebase nat rules "SNAT-Outbound-PCI" from PCI-Cardholder to Untrust source OBJ_NET_PCI to-interface ethernet1/1 source-translation dynamic-ip-and-port interface-address interface ethernet1/1
+set rulebase nat rules "SNAT-Outbound-DMZ" from DMZ to Untrust source OBJ_NET_DMZ to-interface ethernet1/1 source-translation dynamic-ip-and-port interface-address interface ethernet1/1
+
+# --- Security Policy Rules (App-ID Driven) ---
+# Rule 1: Allow public internet to access DMZ web servers with App-ID ssl & web-browsing
+set rulebase security rules "Allow-Inbound-Web" from Untrust to DMZ source any destination OBJ_HOST_WEB_SRV01 application [ web-browsing ssl ] service application-default action allow description "Permit public HTTPS/HTTP to DMZ Web Server"
+
+# Rule 2: Allow DMZ web server to call internal core app server REST APIs
+set rulebase security rules "Allow-DMZ-to-App" from DMZ to Trust-Internal source OBJ_HOST_WEB_SRV01 destination OBJ_HOST_APP_SRV01 application [ web-browsing ssl ] service application-default action allow description "Permit DMZ microservice proxying to App Server"
+
+# Rule 3: Allow Internal App Server to connect to Database
+set rulebase security rules "Allow-App-to-DB" from Trust-Internal to Trust-Internal source OBJ_HOST_APP_SRV01 destination OBJ_HOST_DB_SRV01 application [ postgresql ] service application-default action allow description "Permit App to DB SQL queries"
+
+# Rule 4: [NEW CR-4910] Allow DMZ Web to Payment Gateway via App-ID ssl
+set rulebase security rules "Allow-DMZ-to-Payment-GW" from DMZ to PCI-Cardholder source OBJ_NET_DMZ destination OBJ_HOST_PAYMENT_GW application [ ssl ] service application-default action allow description "Permit DMZ to tokenization payment gateway"
+
+# Rule 5: [NEW CR-4910] Allow Payment Gateway to Database for settlement logging
+set rulebase security rules "Allow-Payment-to-DB" from PCI-Cardholder to Trust-Internal source OBJ_HOST_PAYMENT_GW destination OBJ_HOST_DB_SRV01 application [ postgresql ] service application-default action allow description "Permit PCI settlement records to DB"
+
+# Rule 6: Strict Drop for any direct attempt from DMZ to DB
+set rulebase security rules "Deny-DMZ-to-DB" from DMZ to Trust-Internal source OBJ_NET_DMZ destination OBJ_HOST_DB_SRV01 application any action drop description "Zero Trust: Strict block DMZ lateral movement to DB"
+
+# Rule 7: Block external scanners trying SSH / Telnet / RDP
+set rulebase security rules "Block-Untrust-Scanners" from Untrust to any source any destination any application [ ssh telnet ms-rdp ] action drop description "Mitigate unauthorized administrative access probes"
+
+# --- Operational Dump: show arp all ---
+# interface         ip address        hw address        status   ttl
+# ethernet1/1       203.0.113.254     00:50:56:a1:10:01 c        1190 (ISP Gateway)
+# ethernet1/2       192.168.10.80     00:50:56:a1:10:80 c        1180 (OBJ_HOST_WEB_SRV01)
+# ethernet1/2       192.168.10.85     00:50:56:a1:10:85 c        1175 (OBJ_HOST_API_PROXY02)
+# ethernet1/3       10.100.1.20       00:50:56:a1:20:20 c        1150 (OBJ_HOST_APP_SRV01)
+# ethernet1/3       10.100.1.50       00:50:56:a1:20:50 c        1140 (OBJ_HOST_DB_SRV01)
+# ethernet1/5       10.200.50.25      00:50:56:a1:50:25 c        1195 (OBJ_HOST_PAYMENT_GW)
+# ethernet1/8       10.254.1.10       00:50:56:a1:00:10 c        1200 (OBJ_HOST_MGMT_BASTION)
