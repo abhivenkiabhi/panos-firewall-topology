@@ -14,6 +14,7 @@ from panos_log_ingestor import PanOSLogIngestor
 from panos_topology_engine import PanOSTopologyEngine
 from panos_diff_engine import PanOSDiffEngine
 from panos_qa_agent import PanOSQAAgent
+from panos_guardrail import ModelArmorGuardrail, AIGatewayRouter
 
 app = FastAPI(title="Palo Alto Networks PAN-OS Topology Viewer API", version="2.0.0")
 
@@ -44,6 +45,10 @@ panos_engine_v2 = PanOSTopologyEngine(panos_parser_v2, panos_ingestor)
 
 panos_diff_engine = PanOSDiffEngine(panos_engine_v1, panos_engine_v2)
 panos_qa_agent = PanOSQAAgent(panos_engine_v1, panos_engine_v2, panos_diff_engine, panos_ingestor)
+
+# Initialize AI Gateway & Model Armor Guardrail
+model_armor = ModelArmorGuardrail()
+ai_gateway = AIGatewayRouter(guardrail=model_armor)
 
 
 class SimulateRequest(BaseModel):
@@ -117,7 +122,16 @@ def simulate_traffic(req: SimulateRequest):
 def answer_customer_question(req: ChatRequest):
     if not req.question.strip():
         raise HTTPException(status_code=400, detail="Question cannot be empty")
-    return panos_qa_agent.answer(req.question)
+    return ai_gateway.process_query(req.question, panos_qa_agent.answer)
+
+
+@app.get("/api/armor/audit")
+def get_model_armor_audit():
+    return {
+        "total_requests": ai_gateway.total_requests,
+        "blocked_attacks": ai_gateway.blocked_requests,
+        "audit_logs": model_armor.audit_log
+    }
 
 
 from fastapi.staticfiles import StaticFiles
