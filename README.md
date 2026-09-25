@@ -30,8 +30,18 @@ An interactive **Next-Generation Firewall (NGFW) Topology Viewer, Commit Diff Tr
    * Real-time ingestion and filtering of authentic PAN-OS CSV traffic and threat logs.
    * Filter sessions by action (`ALLOW`, `DROP`), application (`ssl`, `postgresql`, `ssh`), or destination port.
 
-5. **PAN-OS Strata AI Assistant**:
+5. **Site-to-Site IPsec VPN Tunnels & IKE Gateways**:
+   * Models authentic PAN-OS tunnel interfaces (`tunnel.1`, `tunnel.2`), IKE Gateways (`GW-AWS-VPC-East`, `GW-Branch-Chicago`), and Suite-B encryption profiles (`AES-256-GCM`).
+   * Evaluates FIB static-route lookups through tunnel interfaces into `VPN-SiteToSite` security zone.
+
+6. **PAN-OS Strata AI Assistant**:
    * Answers natural language questions regarding security policies, zone segmentation, drop incidents, and change tickets using authoritative PAN-OS terminology.
+
+7. **AI Gateway & Model Armor Security Guardrails**:
+   * Built-in LLM perimeter defense inspired by **Palo Alto Networks AI Runtime Security** and **Google Cloud Model Armor**.
+   * **Prompt Injection Defense**: Intercepts direct adversarial overrides (`Ignore previous instructions...`) and roleplay jailbreaks (`DAN`).
+   * **Data Loss Prevention (DLP)**: Redacts sensitive PAN-OS configuration secrets, IKE pre-shared keys, password hashes (`phash`), and API tokens.
+   * **SecOps Audit Logging**: Telemetry endpoint (`GET /api/armor/audit`) tracking total queries, blocked attacks, and threat vectors.
 
 ---
 
