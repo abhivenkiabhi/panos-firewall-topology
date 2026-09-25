@@ -87,6 +87,12 @@ def get_topology_diff():
     return panos_diff_engine.to_dict()
 
 
+@app.get("/api/blast-radius")
+def get_node_blast_radius(node_id: str, revision: str = "v2"):
+    engine = panos_engine_v1 if revision == "v1" else panos_engine_v2
+    return engine.calculate_blast_radius(node_id)
+
+
 @app.get("/api/logs")
 def get_logs(limit: int = 50, action: Optional[str] = None):
     events = panos_ingestor.events

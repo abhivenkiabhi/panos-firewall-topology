@@ -118,6 +118,24 @@ class TestPanOSEngine(unittest.TestCase):
         self.assertIn("To-Branch-Chicago", ans_tun["answer"])
         self.assertEqual(len(ans_tun["tunnels"]), 2)
 
+        # Autonomous Agent RCA question
+        ans_rca = self.qa_agent.answer("What is happening and why did things break after CR-4910?")
+        self.assertEqual(ans_rca["category"], "autonomous_rca")
+        self.assertIn("Autonomous Strata Agent Investigation Trace", ans_rca["answer"])
+        self.assertIn("tool_analyze_commit_diff", ans_rca["answer"])
+        self.assertIn("tool_simulate_packet_path", ans_rca["answer"])
+        self.assertIn("configure", ans_rca["answer"])
+
+        # Blast Radius question & engine calculation
+        blast = self.topo_v2.calculate_blast_radius("host-192-168-10-80")
+        self.assertEqual(blast["target_node_id"], "host-192-168-10-80")
+        self.assertIn("Untrust", blast["inbound_allowed_zones"])
+        self.assertEqual(blast["risk_level"], "CRITICAL")
+
+        ans_blast = self.qa_agent.answer("What is the blast radius of 192.168.10.80?")
+        self.assertEqual(ans_blast["category"], "blast_radius")
+        self.assertIn("Blast Radius & Exposure Analysis", ans_blast["answer"])
+
 
 if __name__ == "__main__":
     unittest.main()

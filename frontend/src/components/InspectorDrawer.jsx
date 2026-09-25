@@ -1,5 +1,5 @@
-import React from 'react';
-import { X, Flame, Terminal, Activity, CheckCircle, XCircle, Route } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Flame, Terminal, Activity, CheckCircle, XCircle, Route, Target } from 'lucide-react';
 
 export default function InspectorDrawer({ 
   node, 
@@ -8,6 +8,19 @@ export default function InspectorDrawer({
   logData,
   onSimulateWithNode 
 }) {
+  const [blastData, setBlastData] = useState(null);
+
+  useEffect(() => {
+    if (!node?.id) return;
+    setBlastData(null);
+    fetch(`/api/blast-radius?node_id=${encodeURIComponent(node.id)}`)
+      .then(res => res.json())
+      .then(data => {
+        if (!data.error) setBlastData(data);
+      })
+      .catch(() => {});
+  }, [node]);
+
   if (!node) return null;
 
   const nodeIp = node.metadata?.ip || node.metadata?.cidr;
@@ -101,6 +114,58 @@ export default function InspectorDrawer({
             </button>
           )}
         </div>
+
+        {/* Blast Radius & Exposure Analysis */}
+        {blastData && (
+          <div className="bg-slate-900/90 rounded-xl p-3 border border-amber-500/30 space-y-2">
+            <div className="flex items-center justify-between">
+              <h4 className="text-[11px] font-bold uppercase tracking-wider text-amber-400 flex items-center space-x-1.5">
+                <Target className="w-3.5 h-3.5 text-amber-400" />
+                <span>Blast Radius & Exposure</span>
+              </h4>
+              <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                blastData.risk_level === 'CRITICAL' ? 'bg-rose-950 text-rose-300 border border-rose-800' :
+                blastData.risk_level === 'HIGH' ? 'bg-orange-950 text-orange-300 border border-orange-800' :
+                blastData.risk_level === 'MEDIUM' ? 'bg-amber-950 text-amber-300 border border-amber-800' :
+                'bg-emerald-950 text-emerald-300 border border-emerald-800'
+              }`}>
+                {blastData.risk_level} RISK
+              </span>
+            </div>
+
+            <p className="text-[11px] text-slate-300 leading-snug">
+              {blastData.summary}
+            </p>
+
+            <div className="grid grid-cols-2 gap-2 text-[11px] pt-1">
+              <div className="p-2 rounded-lg bg-slate-950/60 border border-slate-800">
+                <span className="text-[10px] text-slate-500 block uppercase font-semibold">Inbound Permitted</span>
+                <span className="font-mono text-cyan-300">
+                  {blastData.inbound_allowed_zones?.join(', ') || 'Isolated'}
+                </span>
+              </div>
+              <div className="p-2 rounded-lg bg-slate-950/60 border border-slate-800">
+                <span className="text-[10px] text-slate-500 block uppercase font-semibold">Outbound Egress</span>
+                <span className="font-mono text-cyan-300">
+                  {blastData.outbound_allowed_zones?.join(', ') || 'None'}
+                </span>
+              </div>
+            </div>
+
+            {blastData.allowed_app_ids?.length > 0 && (
+              <div className="pt-1">
+                <span className="text-[10px] text-slate-500 block uppercase font-semibold mb-1">Permitted App-IDs</span>
+                <div className="flex flex-wrap gap-1">
+                  {blastData.allowed_app_ids.map((app, idx) => (
+                    <span key={idx} className="px-1.5 py-0.5 rounded bg-indigo-950 text-indigo-300 border border-indigo-800 text-[10px] font-mono">
+                      {app}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Applied Security Policies */}
         <div>

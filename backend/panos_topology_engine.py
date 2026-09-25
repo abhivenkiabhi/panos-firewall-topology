@@ -346,3 +346,84 @@ class PanOSTopologyEngine:
                 "rules_count": len(self.parser.security_rules)
             }
         }
+
+    def calculate_blast_radius(self, node_id: str) -> Dict[str, Any]:
+        """
+        Calculates the 1-hop and 2-hop blast radius, reachable zones, and attack surface
+        for a given node in the topology.
+        """
+        node = next((n for n in self.nodes if n["id"] == node_id), None)
+        if not node:
+            return {"error": f"Node {node_id} not found"}
+
+        node_zone = node.get("zone")
+        node_ip = node.get("metadata", {}).get("ip") or node.get("metadata", {}).get("cidr")
+
+        # 1-hop directly connected graph edges
+        direct_connected_nodes = set()
+        connected_edges = []
+        for edge in self.edges:
+            if edge["source"] == node_id:
+                direct_connected_nodes.add(edge["target"])
+                connected_edges.append(edge["id"])
+            elif edge["target"] == node_id:
+                direct_connected_nodes.add(edge["source"])
+                connected_edges.append(edge["id"])
+
+        # 2-hop connected graph edges
+        two_hop_nodes = set(direct_connected_nodes)
+        for edge in self.edges:
+            if edge["source"] in direct_connected_nodes and edge["target"] != node_id:
+                two_hop_nodes.add(edge["target"])
+                connected_edges.append(edge["id"])
+            elif edge["target"] in direct_connected_nodes and edge["source"] != node_id:
+                two_hop_nodes.add(edge["source"])
+                connected_edges.append(edge["id"])
+
+        # Policy-level blast radius: Which zones can talk to this node's zone, and which can it reach?
+        inbound_allowed_zones = set()
+        outbound_allowed_zones = set()
+        allowed_apps = set()
+
+        for rule in self.parser.security_rules:
+            if rule.get("action", "").upper() == "ALLOW":
+                from_z = rule.get("from_zone")
+                to_z = rule.get("to_zone")
+                apps = rule.get("applications", [])
+                
+                # Check inbound access to this node's zone
+                if to_z == node_zone:
+                    inbound_allowed_zones.add(from_z)
+                    allowed_apps.update(apps)
+                # Check outbound access from this node's zone
+                if from_z == node_zone:
+                    outbound_allowed_zones.add(to_z)
+                    allowed_apps.update(apps)
+
+        # Intrazone is always allowed in PAN-OS
+        if node_zone:
+            inbound_allowed_zones.add(node_zone)
+            outbound_allowed_zones.add(node_zone)
+
+        # Risk scoring
+        risk = "LOW"
+        if "Untrust" in inbound_allowed_zones:
+            risk = "CRITICAL"  # Directly exposed to Internet
+        elif "DMZ" in inbound_allowed_zones or len(inbound_allowed_zones) >= 3:
+            risk = "HIGH"
+        elif len(inbound_allowed_zones) > 1:
+            risk = "MEDIUM"
+
+        return {
+            "target_node_id": node_id,
+            "target_label": node.get("label", "").split("\n")[0],
+            "zone": node_zone,
+            "ip": node_ip,
+            "risk_level": risk,
+            "connected_node_ids": list(two_hop_nodes | {node_id}),
+            "connected_edge_ids": list(set(connected_edges)),
+            "inbound_allowed_zones": sorted(list(inbound_allowed_zones)),
+            "outbound_allowed_zones": sorted(list(outbound_allowed_zones)),
+            "allowed_app_ids": sorted(list(allowed_apps)),
+            "summary": f"{node.get('label', '').split(chr(10))[0]} in zone '{node_zone}' has a {risk} exposure profile. Inbound traffic allowed from: {', '.join(inbound_allowed_zones) or 'None'}."
+        }

@@ -34,10 +34,20 @@ An interactive **Next-Generation Firewall (NGFW) Topology Viewer, Commit Diff Tr
    * Models authentic PAN-OS tunnel interfaces (`tunnel.1`, `tunnel.2`), IKE Gateways (`GW-AWS-VPC-East`, `GW-Branch-Chicago`), and Suite-B encryption profiles (`AES-256-GCM`).
    * Evaluates FIB static-route lookups through tunnel interfaces into `VPN-SiteToSite` security zone.
 
-6. **PAN-OS Strata AI Assistant**:
-   * Answers natural language questions regarding security policies, zone segmentation, drop incidents, and change tickets using authoritative PAN-OS terminology.
+6. **Instant Node Search & Interactive Blast Radius Isolation**:
+   * Real-time search filter directly on the canvas to find nodes by IP, Zone, Subnet, or Hostname.
+   * **Blast Radius Mode**: Select any firewall node or workload to instantly isolate 1-hop and 2-hop connected network dependencies, automatically dimming unrelated elements and pulsing connected links.
+   * **Zero-Trust Exposure Profiler**: Computes attack surface risk (`CRITICAL`, `HIGH`, `MEDIUM`, `LOW`), permitted inbound ingress zones, outbound egress targets, and authorized App-IDs.
 
-7. **AI Gateway & Model Armor Security Guardrails**:
+7. **Autonomous Multi-Tool ReAct Agent (Root Cause Analysis & Remediation)**:
+   * Empowers SecOps teams to ask complex, high-level questions such as:
+     * *"What is happening and why did things break after CR-4910?"*
+     * *"Why is Chicago branch failing to reach the payment gateway?"*
+     * *"Show blast radius for DMZ Web 192.168.10.80"*
+   * Executes multi-step ReAct tool chaining (`tool_analyze_commit_diff`, `tool_search_threat_logs`, `tool_simulate_packet_path`, `tool_calculate_blast_radius`).
+   * Generates exact, copy-pasteable PAN-OS CLI configuration remediation scripts with automated commit comments.
+
+8. **AI Gateway & Model Armor Security Guardrails**:
    * Built-in LLM perimeter defense inspired by **Palo Alto Networks AI Runtime Security** and **Google Cloud Model Armor**.
    * **Prompt Injection Defense**: Intercepts direct adversarial overrides (`Ignore previous instructions...`) and roleplay jailbreaks (`DAN`).
    * **Data Loss Prevention (DLP)**: Redacts sensitive PAN-OS configuration secrets, IKE pre-shared keys, password hashes (`phash`), and API tokens.

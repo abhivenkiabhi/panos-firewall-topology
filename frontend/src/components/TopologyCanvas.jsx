@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   Shield, 
   Server, 
@@ -13,7 +13,10 @@ import {
   ZoomOut,
   Maximize2,
   Flame,
-  Route
+  Route,
+  Search,
+  Target,
+  X
 } from 'lucide-react';
 
 export default function TopologyCanvas({ 
@@ -29,6 +32,8 @@ export default function TopologyCanvas({
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [searchQuery, setSearchQuery] = useState('');
+  const [blastRadiusActive, setBlastRadiusActive] = useState(false);
 
   // Coordinated positions for PAN-OS architecture
   const layoutCoords = {
@@ -48,7 +53,46 @@ export default function TopologyCanvas({
     'host-192-168-99-44': { x: 170, y: 590 },
     'subnet-Management': { x: 860, y: 520 },
     'host-10-254-1-10': { x: 1060, y: 520 },
+    'subnet-VPN-SiteToSite': { x: 260, y: 340 },
+    'vpn-to-aws-vpc': { x: 70, y: 290 },
+    'vpn-to-branch-chicago': { x: 70, y: 390 },
   };
+
+  // Connected nodes calculation for Blast Radius Isolation
+  const connectedNodeIds = useMemo(() => {
+    if (!blastRadiusActive || !selectedNode) return null;
+    const direct = new Set([selectedNode.id]);
+    topologyData?.edges?.forEach(e => {
+      if (e.source === selectedNode.id) direct.add(e.target);
+      if (e.target === selectedNode.id) direct.add(e.source);
+    });
+    // 2-hop expansion
+    const twoHop = new Set(direct);
+    topologyData?.edges?.forEach(e => {
+      if (direct.has(e.source)) twoHop.add(e.target);
+      if (direct.has(e.target)) twoHop.add(e.source);
+    });
+    return twoHop;
+  }, [blastRadiusActive, selectedNode, topologyData]);
+
+  // Search filter matching nodes
+  const matchingNodeIds = useMemo(() => {
+    if (!searchQuery.trim()) return null;
+    const q = searchQuery.toLowerCase();
+    const matches = new Set();
+    topologyData?.nodes?.forEach(n => {
+      if (
+        n.label?.toLowerCase().includes(q) ||
+        n.id?.toLowerCase().includes(q) ||
+        n.zone?.toLowerCase().includes(q) ||
+        n.metadata?.ip?.toLowerCase().includes(q) ||
+        n.metadata?.cidr?.toLowerCase().includes(q)
+      ) {
+        matches.add(n.id);
+      }
+    });
+    return matches;
+  }, [searchQuery, topologyData]);
 
   const handleMouseDown = (e) => {
     if (e.target.tagName === 'svg' || e.target.id === 'canvas-bg') {
@@ -69,6 +113,7 @@ export default function TopologyCanvas({
     const id = node.id;
     if (id === 'node-PA-NGFW-CORE-01') return <Flame className="w-8 h-8 text-[#fa582d]" />;
     if (id === 'node-vr-default') return <Route className="w-5 h-5 text-amber-400" />;
+    if (id.includes('vpn') || id.includes('aws') || id.includes('branch')) return <Globe className="w-5 h-5 text-sky-400" />;
     if (id === 'node-internet-gw') return <Globe className="w-6 h-6 text-rose-400" />;
     if (id.includes('DB') || id.includes('50')) return <Database className="w-5 h-5 text-emerald-400" />;
     if (id.includes('PCI') || id.includes('PAYMENT') || id.includes('25')) return <CreditCard className="w-5 h-5 text-purple-400" />;
@@ -80,10 +125,16 @@ export default function TopologyCanvas({
   const getNodeClasses = (node) => {
     const isSelected = selectedNode?.id === node.id;
     const diffStatus = node.diff_status;
+    const isBlastTarget = selectedNode?.id === node.id && blastRadiusActive;
+    const isBlastConnected = connectedNodeIds?.has(node.id) && blastRadiusActive;
 
     let base = "cursor-pointer transition-all duration-200 select-none ";
     
-    if (isSelected) {
+    if (isBlastTarget) {
+      base += "ring-4 ring-amber-400 ring-offset-2 ring-offset-slate-950 scale-105 shadow-2xl shadow-amber-500/50 ";
+    } else if (isBlastConnected) {
+      base += "ring-2 ring-amber-400/80 ring-offset-1 ring-offset-slate-950 ";
+    } else if (isSelected) {
       base += "ring-4 ring-[#fa582d] ring-offset-2 ring-offset-slate-950 scale-105 ";
     }
 
@@ -92,6 +143,9 @@ export default function TopologyCanvas({
     }
     if (diffStatus === 'removed') {
       return base + "border-2 border-dashed border-rose-500 bg-rose-950/40 opacity-70 shadow-none";
+    }
+    if (node.id?.includes('vpn') || node.id?.includes('aws') || node.id?.includes('branch')) {
+      return base + "border-2 border-sky-500/80 bg-sky-950/50 shadow-lg shadow-sky-500/20";
     }
     if (node.type === 'firewall') {
       return base + "border-2 border-[#fa582d]/80 bg-gradient-to-b from-slate-900 via-slate-900 to-[#fa582d]/20 shadow-xl shadow-[#fa582d]/20";
@@ -128,6 +182,44 @@ export default function TopologyCanvas({
         </defs>
         <rect width="100%" height="100%" fill="url(#grid)" />
       </svg>
+
+      {/* Search & Blast Radius Filter Bar */}
+      <div className="absolute top-4 left-6 z-20 flex items-center space-x-3 bg-slate-900/95 border border-slate-800 p-2 rounded-2xl shadow-2xl backdrop-blur">
+        <div className="flex items-center space-x-2 px-2.5 py-1.5 bg-slate-950/70 border border-slate-800 rounded-xl">
+          <Search className="w-4 h-4 text-slate-400" />
+          <input 
+            type="text" 
+            placeholder="Search IP, Zone, Subnet..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="bg-transparent text-xs text-white placeholder-slate-500 focus:outline-none w-48 font-mono"
+          />
+          {searchQuery && (
+            <button onClick={() => setSearchQuery('')} className="text-slate-500 hover:text-white">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+
+        {selectedNode ? (
+          <button
+            onClick={() => setBlastRadiusActive(!blastRadiusActive)}
+            className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+              blastRadiusActive 
+                ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/30' 
+                : 'bg-slate-800 text-amber-400 hover:bg-slate-700 border border-amber-500/30'
+            }`}
+            title="Isolate 1-hop and 2-hop blast radius"
+          >
+            <Target className="w-3.5 h-3.5" />
+            <span>{blastRadiusActive ? 'Blast Radius: ACTIVE' : 'Isolate Blast Radius'}</span>
+          </button>
+        ) : (
+          <div className="text-[11px] text-slate-400 italic px-2">
+            Click any node to calculate blast radius
+          </div>
+        )}
+      </div>
 
       {/* Canvas Controls */}
       <div className="absolute bottom-6 left-6 z-20 flex items-center space-x-2 bg-slate-900/90 border border-slate-800 p-1.5 rounded-xl shadow-xl backdrop-blur">
@@ -277,6 +369,13 @@ export default function TopologyCanvas({
           />
           <text x="796" y="486" fill="#60a5fa" fontSize="11" fontWeight="700" letterSpacing="0.05em">PAN-OS ZONE: Management (ethernet1/8)</text>
 
+          {/* VPN-SiteToSite Zone Box */}
+          <rect 
+            x="45" y="240" width="280" height="200" rx="16" 
+            fill="#0284c7" fillOpacity="0.04" stroke="#0284c7" strokeOpacity="0.3" strokeWidth="1.5" strokeDasharray="4 4" 
+          />
+          <text x="60" y="266" fill="#38bdf8" fontSize="11" fontWeight="700" letterSpacing="0.05em">PAN-OS ZONE: VPN-SiteToSite (tunnel.1 & tunnel.2)</text>
+
           {/* 2. Physical & Logical Links */}
           {topologyData?.edges?.map((edge) => {
             const srcCoord = layoutCoords[edge.source];
@@ -289,6 +388,9 @@ export default function TopologyCanvas({
             const isDiffAdded = edge.diff_status === 'added';
             const isDiffRemoved = edge.diff_status === 'removed';
             const isSimPath = isSimulatedPath(edge.source, edge.target);
+            const isBlastEdge = connectedNodeIds && connectedNodeIds.has(edge.source) && connectedNodeIds.has(edge.target) && blastRadiusActive;
+            const isEdgeDimmed = (connectedNodeIds && (!connectedNodeIds.has(edge.source) || !connectedNodeIds.has(edge.target))) ||
+                                 (matchingNodeIds && (!matchingNodeIds.has(edge.source) && !matchingNodeIds.has(edge.target)));
 
             let strokeColor = "#334155";
             let strokeWidth = "2";
@@ -297,6 +399,10 @@ export default function TopologyCanvas({
             if (isSimPath) {
               strokeColor = "#fa582d";
               strokeWidth = "3.5";
+            } else if (isBlastEdge) {
+              strokeColor = "#f59e0b";
+              strokeWidth = "3";
+              dashArray = "4 4";
             } else if (isDiffAdded) {
               strokeColor = "#10b981";
               strokeWidth = "2.5";
@@ -310,7 +416,7 @@ export default function TopologyCanvas({
             }
 
             return (
-              <g key={edge.id}>
+              <g key={edge.id} opacity={isEdgeDimmed ? 0.12 : 1} style={{ transition: 'opacity 0.25s ease' }}>
                 <line 
                   x1={srcCoord.x} 
                   y1={srcCoord.y} 
@@ -413,6 +519,9 @@ export default function TopologyCanvas({
             let w = isFw ? 230 : isVR ? 180 : isSubnet ? 165 : 170;
             let h = isFw ? 96 : isVR ? 56 : isSubnet ? 64 : 64;
 
+            const isDimmed = (connectedNodeIds && !connectedNodeIds.has(node.id)) ||
+                             (matchingNodeIds && !matchingNodeIds.has(node.id));
+
             return (
               <foreignObject
                 key={node.id}
@@ -421,6 +530,7 @@ export default function TopologyCanvas({
                 width={w}
                 height={h}
                 className="overflow-visible"
+                style={{ opacity: isDimmed ? 0.15 : 1, transition: 'opacity 0.25s ease' }}
               >
                 <div
                   onClick={() => onSelectNode(node)}
