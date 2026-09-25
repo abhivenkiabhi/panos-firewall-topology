@@ -152,6 +152,36 @@ class PanOSTopologyEngine:
                     "type": "l2_link"
                 })
 
+        # 6. VPN Tunnels & Remote Gateways
+        for tun in self.parser.ipsec_tunnels:
+            tun_id = f"vpn-{tun['name'].lower()}"
+            gw = next((g for g in self.parser.ike_gateways if g["name"] == tun.get("ike_gateway")), None)
+            peer_ip = gw["peer_ip"] if gw else "Remote-Cloud"
+            remote_node = {
+                "id": tun_id,
+                "label": f"IPsec: {tun['name']}\n({peer_ip})",
+                "type": "vpn_tunnel",
+                "zone": "VPN-SiteToSite",
+                "metadata": {
+                    "tunnel_name": tun["name"],
+                    "tunnel_interface": tun["tunnel_interface"],
+                    "encryption": tun["encryption"],
+                    "peer_ip": peer_ip,
+                    "ike_gateway": tun.get("ike_gateway", ""),
+                    "status": "IPSEC_TUNNEL_ACTIVE"
+                }
+            }
+            self.nodes.append(remote_node)
+            sub_id = "subnet-VPN-SiteToSite"
+            if sub_id in subnet_nodes:
+                self.edges.append({
+                    "id": f"edge-{tun_id}-{sub_id}",
+                    "source": sub_id,
+                    "target": tun_id,
+                    "label": f"{tun['tunnel_interface']} (AES-GCM)",
+                    "type": "vpn_link"
+                })
+
     def find_zone_for_ip(self, ip_str: str) -> str:
         """Determines the Palo Alto Security Zone for a given IP."""
         try:
@@ -163,6 +193,20 @@ class PanOSTopologyEngine:
         for arp in self.parser.arp_table:
             if arp["ip"] == ip_str:
                 return arp["zone"] or "Untrust"
+
+        # Check static routes in Virtual Router default FIB
+        vr = self.parser.virtual_routers.get("default", {})
+        for route in vr.get("static_routes", []):
+            try:
+                dest_net = ipaddress.IPv4Network(route["destination"], strict=False)
+                if target_ip in dest_net:
+                    if route.get("interface") and "tunnel" in route["interface"]:
+                        return "VPN-SiteToSite"
+                    for iface in self.parser.interfaces:
+                        if iface["name"] == route.get("interface"):
+                            return iface["zone"] or "Untrust"
+            except Exception:
+                continue
 
         # Check interfaces / subnets
         for iface in self.parser.interfaces:

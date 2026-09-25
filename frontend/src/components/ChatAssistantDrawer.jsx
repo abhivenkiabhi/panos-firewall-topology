@@ -18,6 +18,7 @@ export default function ChatAssistantDrawer({
   const messagesEndRef = useRef(null);
 
   const quickPrompts = [
+    "What VPN tunnels do I have?",
     "What changed in PAN-OS config for CR-4910?",
     "Can DMZ Web reach Payment GW with App-ID ssl?",
     "Why was traffic from 198.51.100.22 dropped?",

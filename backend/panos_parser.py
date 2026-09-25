@@ -22,6 +22,9 @@ class PanOSConfigParser:
         self.security_rules: List[Dict[str, Any]] = []
         self.nat_rules: List[Dict[str, Any]] = []
         self.arp_table: List[Dict[str, str]] = []
+        self.tunnels: List[Dict[str, Any]] = []
+        self.ike_gateways: List[Dict[str, Any]] = []
+        self.ipsec_tunnels: List[Dict[str, Any]] = []
         
         self.parse()
 
@@ -64,6 +67,68 @@ class PanOSConfigParser:
                 if if_name in iface_dict:
                     iface_dict[if_name]["comment"] = comment
 
+            # Tunnel interfaces
+            # Example: set network interface tunnel units tunnel.1 ip 10.250.1.1/30
+            m_tun_if = re.match(r"^set\s+network\s+interface\s+tunnel\s+units\s+(tunnel\S+)\s+ip\s+(\d+\.\d+\.\d+\.\d+/\d+)", line)
+            if m_tun_if:
+                t_name, cidr = m_tun_if.groups()
+                ip_addr = cidr.split('/')[0]
+                try:
+                    net = ipaddress.IPv4Network(cidr, strict=False)
+                    subnet_str = str(net)
+                except Exception:
+                    subnet_str = cidr
+                t_entry = {
+                    "id": t_name,
+                    "name": t_name,
+                    "ip": ip_addr,
+                    "cidr": cidr,
+                    "subnet": subnet_str,
+                    "zone": None,
+                    "comment": "IPsec Tunnel Interface",
+                    "type": "tunnel"
+                }
+                iface_dict[t_name] = t_entry
+                self.tunnels.append(t_entry)
+
+            m_tun_c = re.match(r"^set\s+network\s+interface\s+tunnel\s+units\s+(tunnel\S+)\s+comment\s+\"([^\"]+)\"", line)
+            if m_tun_c:
+                t_name, comment = m_tun_c.groups()
+                if t_name in iface_dict:
+                    iface_dict[t_name]["comment"] = comment
+
+            # IKE Gateway parsing
+            m_gw = re.match(r"^set\s+network\s+ike\s+gateway\s+\"([^\"]+)\"\s+(.+)", line)
+            if m_gw:
+                gw_name, params = m_gw.groups()
+                peer_m = re.search(r"peer-address\s+ip\s+(\d+\.\d+\.\d+\.\d+)", params)
+                local_if_m = re.search(r"interface\s+(\S+)", params)
+                local_ip_m = re.search(r"local-address\s+interface\s+\S+\s+ip\s+(\d+\.\d+\.\d+\.\d+)", params)
+                ikev2_m = "ikev2 yes" in params
+                self.ike_gateways.append({
+                    "name": gw_name,
+                    "peer_ip": peer_m.group(1) if peer_m else "",
+                    "local_interface": local_if_m.group(1) if local_if_m else "",
+                    "local_ip": local_ip_m.group(1) if local_ip_m else "",
+                    "version": "IKEv2" if ikev2_m else "IKEv1",
+                    "status": "IKE_SA_ESTABLISHED"
+                })
+
+            # IPsec Tunnel parsing
+            m_ipsec = re.match(r"^set\s+network\s+tunnel\s+ipsec\s+\"([^\"]+)\"\s+(.+)", line)
+            if m_ipsec:
+                tun_name, params = m_ipsec.groups()
+                gw_m = re.search(r"ike-gateway\s+\"([^\"]+)\"", params)
+                tif_m = re.search(r"tunnel-interface\s+(tunnel\S+)", params)
+                enc_m = re.search(r"esp-encryption\s+(\S+)", params)
+                self.ipsec_tunnels.append({
+                    "name": tun_name,
+                    "ike_gateway": gw_m.group(1) if gw_m else "",
+                    "tunnel_interface": tif_m.group(1) if tif_m else "",
+                    "encryption": enc_m.group(1) if enc_m else "aes-256-gcm",
+                    "status": "IPSEC_TUNNEL_ACTIVE"
+                })
+
         # 3. Security Zones
         # Example: set zone Untrust network layer3 ethernet1/1
         # Example with multiple: set zone Untrust network layer3 [ ethernet1/1 ethernet1/2 ]
@@ -78,6 +143,18 @@ class PanOSConfigParser:
                 if clean_if in iface_dict:
                     iface_dict[clean_if]["zone"] = z_name
 
+            # Support bracket list: set zone VPN-SiteToSite network layer3 [ tunnel.1 tunnel.2 ]
+            m_multi = re.match(r"^set\s+zone\s+(\S+)\s+network\s+layer3\s+\[\s*(.+?)\s*\]", line)
+            if m_multi:
+                z_name, ifs_str = m_multi.groups()
+                if z_name not in self.zones:
+                    self.zones[z_name] = {"name": z_name, "interfaces": []}
+                for clean_if in ifs_str.split():
+                    if clean_if not in self.zones[z_name]["interfaces"]:
+                        self.zones[z_name]["interfaces"].append(clean_if)
+                    if clean_if in iface_dict:
+                        iface_dict[clean_if]["zone"] = z_name
+
         self.interfaces = list(iface_dict.values())
 
         # 4. Virtual Routers
@@ -85,7 +162,7 @@ class PanOSConfigParser:
         vr_default = {"name": "default", "interfaces": [], "static_routes": []}
         for line in lines:
             if "set network virtual-router default interface" in line:
-                ifs = re.findall(r"ethernet\S+", line)
+                ifs = re.findall(r"(?:ethernet|tunnel)\S+", line)
                 vr_default["interfaces"].extend(ifs)
             
             m_route = re.match(
@@ -96,7 +173,7 @@ class PanOSConfigParser:
                 vr_name, route_name, params = m_route.groups()
                 dst_m = re.search(r"destination\s+(\d+\.\d+\.\d+\.\d+/\d+)", params)
                 gw_m = re.search(r"nexthop\s+ip-address\s+(\d+\.\d+\.\d+\.\d+)", params)
-                if_m = re.search(r"interface\s+(ethernet\S+)", params)
+                if_m = re.search(r"interface\s+(\S+)", params)
                 vr_default["static_routes"].append({
                     "name": route_name,
                     "destination": dst_m.group(1) if dst_m else "0.0.0.0/0",
@@ -200,5 +277,8 @@ class PanOSConfigParser:
             "address_objects": self.address_objects,
             "security_rules": self.security_rules,
             "nat_rules": self.nat_rules,
-            "arp_table": self.arp_table
+            "arp_table": self.arp_table,
+            "tunnels": self.tunnels,
+            "ike_gateways": self.ike_gateways,
+            "ipsec_tunnels": self.ipsec_tunnels
         }

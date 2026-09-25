@@ -111,6 +111,13 @@ class TestPanOSEngine(unittest.TestCase):
         self.assertEqual(ans_reach["category"], "reachability")
         self.assertEqual(ans_reach["simulation"]["action"], "DROP")
 
+        # VPN Tunnels question
+        ans_tun = self.qa_agent.answer("What VPN tunnels do I have configured?")
+        self.assertEqual(ans_tun["category"], "vpn_tunnels")
+        self.assertIn("To-AWS-VPC", ans_tun["answer"])
+        self.assertIn("To-Branch-Chicago", ans_tun["answer"])
+        self.assertEqual(len(ans_tun["tunnels"]), 2)
+
 
 if __name__ == "__main__":
     unittest.main()

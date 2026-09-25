@@ -21,13 +21,25 @@ set network interface ethernet ethernet1/4 layer3 ip 192.168.99.1/24
 set network interface ethernet ethernet1/4 layer3 comment "Legacy QA & Test Staging Subnet"
 set network interface ethernet ethernet1/8 layer3 ip 10.254.1.1/24
 set network interface ethernet ethernet1/8 layer3 comment "Dedicated Out-of-Band Management"
+set network interface tunnel units tunnel.1 ip 10.250.1.1/30
+set network interface tunnel units tunnel.1 comment "IPsec Site-to-Site Tunnel to AWS Cloud VPC (us-east-1)"
+set network interface tunnel units tunnel.2 ip 10.250.2.1/30
+set network interface tunnel units tunnel.2 comment "IPsec Site-to-Site Tunnel to Branch-Office-Chicago"
+
+# --- IKE Gateways & IPsec Tunnels ---
+set network ike gateway "GW-AWS-VPC-East" local-address interface ethernet1/1 ip 203.0.113.1 peer-address ip 54.239.28.85 pre-shared-key "p@noS_VpnSecretKey2026!" ikev2 yes ikev2-crypto-profile "IKE-SuiteB-AES256"
+set network ike gateway "GW-Branch-Chicago" local-address interface ethernet1/1 ip 203.0.113.1 peer-address ip 198.51.100.99 pre-shared-key "Ch1c@go_Branch_Secure#!" ikev2 yes ikev2-crypto-profile "IKE-SuiteB-AES256"
+set network tunnel ipsec "To-AWS-VPC" auto-key ike-gateway "GW-AWS-VPC-East" tunnel-interface tunnel.1 esp-encryption aes-256-gcm
+set network tunnel ipsec "To-Branch-Chicago" auto-key ike-gateway "GW-Branch-Chicago" tunnel-interface tunnel.2 esp-encryption aes-256-gcm
 
 # --- Virtual Router & Routing Table ---
-set network virtual-router default interface [ ethernet1/1 ethernet1/2 ethernet1/3 ethernet1/4 ethernet1/8 ]
+set network virtual-router default interface [ ethernet1/1 ethernet1/2 ethernet1/3 ethernet1/4 ethernet1/8 tunnel.1 tunnel.2 ]
 set network virtual-router default routing-table ip static-route "Default-Internet-Gateway" nexthop ip-address 203.0.113.254 interface ethernet1/1 metric 10 destination 0.0.0.0/0
 set network virtual-router default routing-table ip static-route "Route-DMZ" interface ethernet1/2 destination 192.168.10.0/24
 set network virtual-router default routing-table ip static-route "Route-Trust-Internal" interface ethernet1/3 destination 10.100.1.0/24
 set network virtual-router default routing-table ip static-route "Route-Legacy-Test" interface ethernet1/4 destination 192.168.99.0/24
+set network virtual-router default routing-table ip static-route "Route-to-AWS-VPC" destination 172.31.0.0/16 interface tunnel.1 nexthop ip-address 10.250.1.2
+set network virtual-router default routing-table ip static-route "Route-to-Branch-Chicago" destination 10.150.0.0/16 interface tunnel.2 nexthop ip-address 10.250.2.2
 
 # --- Security Zones ---
 set zone Untrust network layer3 ethernet1/1
@@ -35,6 +47,7 @@ set zone DMZ network layer3 ethernet1/2
 set zone Trust-Internal network layer3 ethernet1/3
 set zone Legacy-Test network layer3 ethernet1/4
 set zone Management network layer3 ethernet1/8
+set zone VPN-SiteToSite network layer3 [ tunnel.1 tunnel.2 ]
 
 # --- Address Objects & Groups ---
 set address OBJ_NET_DMZ ip-netmask 192.168.10.0/24 description "DMZ Web Subnet"
@@ -45,6 +58,8 @@ set address OBJ_HOST_API_PROXY02 ip-netmask 192.168.10.85/32 description "API Ga
 set address OBJ_HOST_APP_SRV01 ip-netmask 10.100.1.20/32 description "Core Application Server"
 set address OBJ_HOST_DB_SRV01 ip-netmask 10.100.1.50/32 description "Production PostgreSQL Database"
 set address OBJ_HOST_MGMT_BASTION ip-netmask 10.254.1.10/32 description "Engineering SSH Bastion"
+set address OBJ_NET_AWS_VPC ip-netmask 172.31.0.0/16 description "AWS Cloud Production VPC"
+set address OBJ_NET_BRANCH_CHI ip-netmask 10.150.0.0/16 description "Chicago Branch Office LAN"
 
 # --- NAT Policy Rules ---
 # Inbound Destination NAT for Web Server
@@ -71,6 +86,12 @@ set rulebase security rules "Block-Untrust-Scanners" from Untrust to any source 
 
 # Rule 6: Legacy testbed communication
 set rulebase security rules "Allow-Legacy-Staging" from Legacy-Test to Trust-Internal source OBJ_NET_LEGACY destination OBJ_NET_TRUST application any action allow description "Temporary QA staging access"
+
+# Rule 7: Allow Internal Trust to access AWS Cloud VPC via VPN Tunnel (App-ID ssl, postgresql, ssh)
+set rulebase security rules "Allow-Trust-to-AWS" from Trust-Internal to VPN-SiteToSite source OBJ_NET_TRUST destination OBJ_NET_AWS_VPC application [ ssl ssh postgresql ms-rdp ] service application-default action allow description "Permit internal enterprise services to AWS Cloud"
+
+# Rule 8: Allow Chicago Branch Office to access Corporate Internal Apps via VPN Tunnel
+set rulebase security rules "Allow-Branch-to-Trust" from VPN-SiteToSite to Trust-Internal source OBJ_NET_BRANCH_CHI destination OBJ_NET_TRUST application [ web-browsing ssl ssh ] service application-default action allow description "Permit Chicago branch staff access to internal apps"
 
 # --- Operational Dump: show arp all ---
 # interface         ip address        hw address        status   ttl
