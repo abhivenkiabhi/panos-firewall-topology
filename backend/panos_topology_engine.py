@@ -97,7 +97,7 @@ class PanOSTopologyEngine:
         # 4. Internet Gateway Node
         gw_node = {
             "id": "node-internet-gw",
-            "label": "Public Internet / Transit\n(ISP Gateway 203.0.113.254)",
+            "label": "Public Internet (ISP)\n203.0.113.254",
             "type": "gateway",
             "zone": "Untrust",
             "metadata": {"ip": "203.0.113.254"}
@@ -107,7 +107,7 @@ class PanOSTopologyEngine:
             "id": "edge-untrust-gw",
             "source": gw_node["id"],
             "target": "subnet-Untrust",
-            "label": "BGP / Transit",
+            "label": "Transit",
             "type": "gateway_link"
         })
 
@@ -148,7 +148,7 @@ class PanOSTopologyEngine:
                     "id": f"edge-{host_id}-{sub_id}",
                     "source": sub_id,
                     "target": host_id,
-                    "label": arp["mac"],
+                    "label": "",
                     "type": "l2_link"
                 })
 
@@ -178,7 +178,7 @@ class PanOSTopologyEngine:
                     "id": f"edge-{tun_id}-{sub_id}",
                     "source": sub_id,
                     "target": tun_id,
-                    "label": f"{tun['tunnel_interface']} (AES-GCM)",
+                    "label": tun["tunnel_interface"],
                     "type": "vpn_link"
                 })
 

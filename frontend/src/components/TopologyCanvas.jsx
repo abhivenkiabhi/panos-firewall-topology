@@ -30,44 +30,44 @@ export default function TopologyCanvas({
   simulationResult,
   onClearSimulation
 }) {
-  const [zoom, setZoom] = useState(1);
-  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(0.80);
+  const [pan, setPan] = useState({ x: 30, y: 70 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [searchQuery, setSearchQuery] = useState('');
   const [blastRadiusActive, setBlastRadiusActive] = useState(false);
   const [hierarchyDepth, setHierarchyDepth] = useState('all'); // 'all' | 'zones' | 'subnets'
 
-  // 5-Tier Hierarchical layout coordinates for PAN-OS architecture
+  // 5-Tier Hierarchical layout coordinates for PAN-OS architecture (spacious & non-overlapping)
   const layoutCoords = {
     // Tier 1: External Boundaries & WAN (Ingress)
-    'node-internet-gw': { x: 140, y: 170 },
-    'subnet-Untrust': { x: 140, y: 280 },
-    'vpn-to-aws-vpc': { x: 140, y: 430 },
-    'vpn-to-branch-chicago': { x: 140, y: 550 },
-    'subnet-VPN-SiteToSite': { x: 140, y: 670 },
+    'node-internet-gw': { x: 90, y: 190 },
+    'subnet-Untrust': { x: 295, y: 190 },
+    'vpn-to-aws-vpc': { x: 90, y: 380 },
+    'vpn-to-branch-chicago': { x: 90, y: 520 },
+    'subnet-VPN-SiteToSite': { x: 295, y: 450 },
 
     // Tier 2: Enforcement Hub & Virtual Router Core
-    'node-PA-NGFW-CORE-01': { x: 420, y: 310 },
-    'node-vr-default': { x: 420, y: 470 },
+    'node-PA-NGFW-CORE-01': { x: 530, y: 260 },
+    'node-vr-default': { x: 530, y: 480 },
 
     // Tier 3: Demilitarized Zone (DMZ Web Tier)
-    'subnet-DMZ': { x: 700, y: 190 },
-    'host-192-168-10-80': { x: 700, y: 300 },
-    'host-192-168-10-85': { x: 700, y: 410 },
+    'subnet-DMZ': { x: 760, y: 250 },
+    'host-192-168-10-80': { x: 955, y: 185 },
+    'host-192-168-10-85': { x: 955, y: 315 },
 
     // Tier 4: Enterprise Trust & PCI Restricted Zone
-    'subnet-Trust-Internal': { x: 990, y: 170 },
-    'host-10-100-1-20': { x: 990, y: 270 },
-    'host-10-100-1-50': { x: 990, y: 370 },
-    'subnet-PCI-Cardholder': { x: 990, y: 510 },
-    'host-10-200-50-25': { x: 990, y: 620 },
-    'subnet-Legacy-Test': { x: 990, y: 750 },
-    'host-192-168-99-44': { x: 990, y: 850 },
+    'subnet-Trust-Internal': { x: 1140, y: 250 },
+    'host-10-100-1-20': { x: 1335, y: 185 },
+    'host-10-100-1-50': { x: 1335, y: 315 },
+    'subnet-PCI-Cardholder': { x: 1140, y: 470 },
+    'host-10-200-50-25': { x: 1335, y: 470 },
+    'subnet-Legacy-Test': { x: 1140, y: 630 },
+    'host-192-168-99-44': { x: 1335, y: 630 },
 
     // Tier 5: Management Plane & OOB
-    'subnet-Management': { x: 1280, y: 310 },
-    'host-10-254-1-10': { x: 1280, y: 430 },
+    'subnet-Management': { x: 1520, y: 250 },
+    'host-10-254-1-10': { x: 1715, y: 250 },
   };
 
   // Connected nodes calculation for Blast Radius Isolation
@@ -156,39 +156,37 @@ export default function TopologyCanvas({
     const isBlastTarget = blastRadiusActive && selectedNode?.id === node.id;
     const isBlastConnected = blastRadiusActive && connectedNodeIds?.has(node.id) && !isBlastTarget;
 
-    let base = "cursor-pointer transition-all duration-200 select-none shadow-xl border relative ";
+    let base = "cursor-pointer transition-colors duration-150 select-none shadow-md border relative ";
 
     if (isBlastTarget) {
-      base += "ring-4 ring-amber-400 ring-offset-2 ring-offset-slate-950 scale-105 z-30 ";
+      base += "ring-2 ring-amber-400 ring-offset-2 ring-offset-slate-950 border-amber-400 bg-amber-950/40 ";
     } else if (isBlastConnected) {
-      base += "ring-2 ring-amber-400/80 ring-offset-1 ring-offset-slate-950 scale-102 z-20 ";
-    }
-
-    if (isSelected && !blastRadiusActive) {
-      base += "ring-2 ring-[#fa582d] ring-offset-2 ring-offset-slate-950 scale-105 z-20 ";
+      base += "ring-1 ring-amber-400/80 ring-offset-1 ring-offset-slate-950 border-amber-500/60 bg-amber-950/20 ";
+    } else if (isSelected) {
+      base += "ring-2 ring-[#fa582d] ring-offset-2 ring-offset-slate-950 border-[#fa582d] bg-slate-900 ";
     }
 
     if (isFw) {
-      return base + "bg-gradient-to-b from-slate-900 via-slate-900 to-black border-[#fa582d]/50 hover:border-[#fa582d] shadow-[#fa582d]/20";
+      return base + (isSelected ? "" : "bg-gradient-to-b from-slate-900 via-slate-900 to-black border-[#fa582d]/60 hover:border-[#fa582d] shadow-[#fa582d]/20");
     }
 
     if (isVR) {
-      return base + "bg-gradient-to-b from-slate-900 to-amber-950/40 border-amber-500/50 hover:border-amber-400 shadow-amber-500/20";
+      return base + (isSelected ? "" : "bg-gradient-to-b from-slate-900 to-amber-950/40 border-amber-500/50 hover:border-amber-400 shadow-amber-500/20");
     }
 
     if (isDiffAdded) {
-      return base + "bg-emerald-950/70 border-emerald-500 shadow-emerald-500/30 text-emerald-100 hover:border-emerald-400";
+      return base + (isSelected ? "" : "bg-emerald-950/70 border-emerald-500 shadow-emerald-500/30 text-emerald-100 hover:border-emerald-400");
     }
 
     if (isDiffRemoved) {
-      return base + "bg-rose-950/70 border-rose-500/80 border-dashed text-rose-300 opacity-75 hover:border-rose-400";
+      return base + (isSelected ? "" : "bg-rose-950/70 border-rose-500/80 border-dashed text-rose-300 opacity-75 hover:border-rose-400");
     }
 
     if (isSubnet) {
-      return base + "bg-slate-900/90 border-indigo-900/60 hover:border-indigo-500/80 text-slate-200";
+      return base + (isSelected ? "" : "bg-[#0c1222] border-indigo-900/60 hover:border-indigo-500/80 text-slate-200");
     }
 
-    return base + "bg-slate-900/95 border-slate-800 hover:border-slate-600 text-slate-200";
+    return base + (isSelected ? "" : "bg-[#0b0f19] border-slate-800 hover:border-slate-600 text-slate-200");
   };
 
   const isSimulatedPath = (srcId, dstId) => {
@@ -196,6 +194,64 @@ export default function TopologyCanvas({
     const src = simulationResult.src_ip;
     const dst = simulationResult.dst_ip;
     return (srcId?.includes(src.replace(/\./g, '-')) || dstId?.includes(dst.replace(/\./g, '-')));
+  };
+
+  // Smart link routing helper preventing line overlaps with intervening zones
+  const getEdgePath = (edge, srcCoord, dstCoord) => {
+    // 1. Firewall to Trust-Internal: Arches overhead cleanly above DMZ in corridor
+    if (
+      (edge.source === 'node-PA-NGFW-CORE-01' && edge.target === 'subnet-Trust-Internal') ||
+      (edge.target === 'node-PA-NGFW-CORE-01' && edge.source === 'subnet-Trust-Internal')
+    ) {
+      return {
+        d: `M 645 230 C 760 92, 1000 92, 1065 230`,
+        labelX: 880,
+        labelY: 92
+      };
+    }
+
+    // 2. Firewall to Management: Arches overhead across DMZ and Trust
+    if (
+      (edge.source === 'node-PA-NGFW-CORE-01' && edge.target === 'subnet-Management') ||
+      (edge.target === 'node-PA-NGFW-CORE-01' && edge.source === 'subnet-Management')
+    ) {
+      return {
+        d: `M 645 210 C 800 35, 1300 35, 1445 230`,
+        labelX: 1050,
+        labelY: 36
+      };
+    }
+
+    // 3. Firewall to PCI-Cardholder: Curves underneath DMZ
+    if (
+      (edge.source === 'node-PA-NGFW-CORE-01' && edge.target === 'subnet-PCI-Cardholder') ||
+      (edge.target === 'node-PA-NGFW-CORE-01' && edge.source === 'subnet-PCI-Cardholder')
+    ) {
+      return {
+        d: `M 645 280 C 770 415, 980 440, 1065 470`,
+        labelX: 870,
+        labelY: 415
+      };
+    }
+
+    // 4. Firewall to Legacy-Test: Curves underneath DMZ and VR
+    if (
+      (edge.source === 'node-PA-NGFW-CORE-01' && edge.target === 'subnet-Legacy-Test') ||
+      (edge.target === 'node-PA-NGFW-CORE-01' && edge.source === 'subnet-Legacy-Test')
+    ) {
+      return {
+        d: `M 645 295 C 770 590, 980 610, 1065 630`,
+        labelX: 870,
+        labelY: 595
+      };
+    }
+
+    // Default: Clean straight link
+    return {
+      d: `M ${srcCoord.x} ${srcCoord.y} L ${dstCoord.x} ${dstCoord.y}`,
+      labelX: (srcCoord.x + dstCoord.x) / 2,
+      labelY: (srcCoord.y + dstCoord.y) / 2
+    };
   };
 
   // Breadcrumbs derivation
@@ -370,7 +426,7 @@ export default function TopologyCanvas({
           <ZoomOut className="w-4 h-4" />
         </button>
         <button 
-          onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }); }}
+          onClick={() => { setZoom(0.80); setPan({ x: 30, y: 70 }); }}
           className="p-2 rounded-lg hover:bg-slate-800 text-slate-300 hover:text-white"
           title="Reset View"
         >
@@ -458,74 +514,81 @@ export default function TopologyCanvas({
           </defs>
 
           {/* 5-Tier Vertical Column Dividers */}
-          <line x1="280" y1="40" x2="280" y2="920" stroke="#1e293b" strokeWidth="1" strokeDasharray="4 4" />
-          <line x1="560" y1="40" x2="560" y2="920" stroke="#1e293b" strokeWidth="1" strokeDasharray="4 4" />
-          <line x1="840" y1="40" x2="840" y2="920" stroke="#1e293b" strokeWidth="1" strokeDasharray="4 4" />
-          <line x1="1140" y1="40" x2="1140" y2="920" stroke="#1e293b" strokeWidth="1" strokeDasharray="4 4" />
+          <line x1="385" y1="40" x2="385" y2="720" stroke="#1e293b" strokeWidth="1" strokeDasharray="4 4" />
+          <line x1="675" y1="40" x2="675" y2="720" stroke="#1e293b" strokeWidth="1" strokeDasharray="4 4" />
+          <line x1="1045" y1="40" x2="1045" y2="720" stroke="#1e293b" strokeWidth="1" strokeDasharray="4 4" />
+          <line x1="1425" y1="40" x2="1425" y2="720" stroke="#1e293b" strokeWidth="1" strokeDasharray="4 4" />
 
           {/* Tier Header Badges */}
           <g>
             {/* Tier 1 */}
-            <rect x="40" y="50" width="220" height="26" rx="6" fill="#0f172a" stroke="#334155" strokeWidth="1" />
-            <text x="52" y="67" fill="#94a3b8" fontSize="10" fontWeight="800" letterSpacing="0.08em">TIER 1: EXTERNAL / WAN INGRESS</text>
+            <rect x="10" y="50" width="365" height="26" rx="6" fill="#0f172a" stroke="#334155" strokeWidth="1" />
+            <text x="192" y="67" textAnchor="middle" fill="#94a3b8" fontSize="10" fontWeight="800" letterSpacing="0.08em">TIER 1: EXTERNAL / WAN INGRESS</text>
 
             {/* Tier 2 */}
-            <rect x="310" y="50" width="220" height="26" rx="6" fill="#0f172a" stroke="#fa582d" strokeOpacity="0.4" strokeWidth="1" />
-            <text x="325" y="67" fill="#fa582d" fontSize="10" fontWeight="800" letterSpacing="0.08em">TIER 2: NGFW CORE & ROUTING</text>
+            <rect x="395" y="50" width="270" height="26" rx="6" fill="#0f172a" stroke="#fa582d" strokeOpacity="0.4" strokeWidth="1" />
+            <text x="530" y="67" textAnchor="middle" fill="#fa582d" fontSize="10" fontWeight="800" letterSpacing="0.08em">TIER 2: NGFW CORE & ROUTING</text>
 
             {/* Tier 3 */}
-            <rect x="590" y="50" width="220" height="26" rx="6" fill="#0f172a" stroke="#f59e0b" strokeOpacity="0.4" strokeWidth="1" />
-            <text x="605" y="67" fill="#f59e0b" fontSize="10" fontWeight="800" letterSpacing="0.08em">TIER 3: DEMILITARIZED (DMZ)</text>
+            <rect x="685" y="50" width="350" height="26" rx="6" fill="#0f172a" stroke="#f59e0b" strokeOpacity="0.4" strokeWidth="1" />
+            <text x="860" y="67" textAnchor="middle" fill="#f59e0b" fontSize="10" fontWeight="800" letterSpacing="0.08em">TIER 3: DEMILITARIZED (DMZ)</text>
 
             {/* Tier 4 */}
-            <rect x="870" y="50" width="240" height="26" rx="6" fill="#0f172a" stroke="#10b981" strokeOpacity="0.4" strokeWidth="1" />
-            <text x="885" y="67" fill="#34d399" fontSize="10" fontWeight="800" letterSpacing="0.08em">TIER 4: ENTERPRISE TRUST & PCI</text>
+            <rect x="1055" y="50" width="360" height="26" rx="6" fill="#0f172a" stroke="#10b981" strokeOpacity="0.4" strokeWidth="1" />
+            <text x="1235" y="67" textAnchor="middle" fill="#34d399" fontSize="10" fontWeight="800" letterSpacing="0.08em">TIER 4: ENTERPRISE TRUST & PCI</text>
 
             {/* Tier 5 */}
-            <rect x="1170" y="50" width="220" height="26" rx="6" fill="#0f172a" stroke="#3b82f6" strokeOpacity="0.4" strokeWidth="1" />
-            <text x="1185" y="67" fill="#60a5fa" fontSize="10" fontWeight="800" letterSpacing="0.08em">TIER 5: MANAGEMENT PLANE</text>
+            <rect x="1435" y="50" width="360" height="26" rx="6" fill="#0f172a" stroke="#3b82f6" strokeOpacity="0.4" strokeWidth="1" />
+            <text x="1615" y="67" textAnchor="middle" fill="#60a5fa" fontSize="10" fontWeight="800" letterSpacing="0.08em">TIER 5: MANAGEMENT PLANE</text>
           </g>
 
           {/* 1. PAN-OS Security Zone Boundary Boxes */}
           {/* Untrust Zone Box */}
           <rect 
-            x="40" y="95" width="220" height="230" rx="14" 
+            x="10" y="110" width="365" height="155" rx="16" 
             fill="#f43f5e" fillOpacity="0.03" stroke="#f43f5e" strokeOpacity="0.25" strokeWidth="1.5" strokeDasharray="4 4" 
           />
-          <text x="52" y="118" fill="#fb7185" fontSize="10" fontWeight="700">PAN-OS ZONE: Untrust (ethernet1/1)</text>
+          <text x="22" y="130" fill="#fb7185" fontSize="10" fontWeight="700">PAN-OS ZONE: Untrust (ethernet1/1 • External WAN)</text>
 
           {/* VPN-SiteToSite Zone Box */}
           <rect 
-            x="40" y="350" width="220" height="360" rx="14" 
+            x="10" y="295" width="365" height="300" rx="16" 
             fill="#0284c7" fillOpacity="0.03" stroke="#0284c7" strokeOpacity="0.3" strokeWidth="1.5" strokeDasharray="4 4" 
           />
-          <text x="52" y="373" fill="#38bdf8" fontSize="10" fontWeight="700">PAN-OS ZONE: VPN-SiteToSite (tunnel.1 & .2)</text>
+          <text x="22" y="318" fill="#38bdf8" fontSize="10" fontWeight="700">PAN-OS ZONE: VPN-SiteToSite (tunnel.1 & .2 IPsec)</text>
+
+          {/* NGFW Core & Routing Hub Box */}
+          <rect 
+            x="395" y="110" width="270" height="485" rx="16" 
+            fill="#fa582d" fillOpacity="0.03" stroke="#fa582d" strokeOpacity="0.25" strokeWidth="1.5" strokeDasharray="4 4" 
+          />
+          <text x="410" y="130" fill="#fa582d" fontSize="10" fontWeight="700">PAN-OS ENFORCEMENT & ROUTING CORE</text>
 
           {/* DMZ Zone Box */}
           <rect 
-            x="590" y="110" width="220" height="340" rx="14" 
+            x="685" y="110" width="350" height="275" rx="16" 
             fill="#f59e0b" fillOpacity="0.03" stroke="#f59e0b" strokeOpacity="0.25" strokeWidth="1.5" strokeDasharray="4 4" 
           />
-          <text x="602" y="133" fill="#fbbf24" fontSize="10" fontWeight="700">PAN-OS ZONE: DMZ (ethernet1/2)</text>
+          <text x="700" y="130" fill="#fbbf24" fontSize="10" fontWeight="700">PAN-OS ZONE: DMZ (ethernet1/2 • Public Web)</text>
 
           {/* Trust-Internal Zone Box */}
           <rect 
-            x="870" y="95" width="240" height="320" rx="14" 
+            x="1055" y="110" width="360" height="275" rx="16" 
             fill="#10b981" fillOpacity="0.03" stroke="#10b981" strokeOpacity="0.25" strokeWidth="1.5" strokeDasharray="4 4" 
           />
-          <text x="882" y="118" fill="#34d399" fontSize="10" fontWeight="700">PAN-OS ZONE: Trust-Internal (ethernet1/3)</text>
+          <text x="1070" y="130" fill="#34d399" fontSize="10" fontWeight="700">PAN-OS ZONE: Trust-Internal (ethernet1/3 • Enterprise Core)</text>
 
           {/* PCI-Cardholder Zone Box (V2 or Diff) */}
           {(revision === 'v2' || revision === 'diff') && (
             <>
               <rect 
-                x="870" y="440" width="240" height="220" rx="14" 
+                x="1055" y="410" width="360" height="140" rx="16" 
                 fill="#8b5cf6" fillOpacity="0.04" 
                 stroke={revision === 'diff' ? '#10b981' : '#8b5cf6'} 
                 strokeOpacity="0.4" strokeWidth={revision === 'diff' ? "2" : "1.5"} 
                 strokeDasharray="4 4" 
               />
-              <text x="882" y="463" fill="#c084fc" fontSize="10" fontWeight="700">
+              <text x="1070" y="430" fill="#c084fc" fontSize="10" fontWeight="700">
                 {revision === 'diff' ? '★ NEW ZONE: PCI-Cardholder (ethernet1/5)' : 'PAN-OS ZONE: PCI-Cardholder (ethernet1/5)'}
               </text>
             </>
@@ -535,25 +598,25 @@ export default function TopologyCanvas({
           {(revision === 'v1' || revision === 'diff') && (
             <>
               <rect 
-                x="870" y="680" width="240" height="200" rx="14" 
+                x="1055" y="570" width="360" height="140" rx="16" 
                 fill="#64748b" fillOpacity="0.03" 
                 stroke={revision === 'diff' ? '#f43f5e' : '#64748b'} 
                 strokeOpacity={revision === 'diff' ? "0.6" : "0.3"} 
                 strokeWidth={revision === 'diff' ? "2" : "1.5"} 
                 strokeDasharray="6 4" 
               />
-              <text x="882" y="703" fill={revision === 'diff' ? '#fb7185' : '#94a3b8'} fontSize="10" fontWeight="700">
-                {revision === 'diff' ? '✖ DECOMMISSIONED: Legacy-Test' : 'ZONE: Legacy-Test'}
+              <text x="1070" y="590" fill={revision === 'diff' ? '#fb7185' : '#94a3b8'} fontSize="10" fontWeight="700">
+                {revision === 'diff' ? '✖ DECOMMISSIONED: Legacy-Test (ethernet1/4)' : 'PAN-OS ZONE: Legacy-Test (ethernet1/4)'}
               </text>
             </>
           )}
 
           {/* Management Zone Box */}
           <rect 
-            x="1170" y="240" width="220" height="230" rx="14" 
+            x="1435" y="110" width="360" height="275" rx="16" 
             fill="#3b82f6" fillOpacity="0.03" stroke="#3b82f6" strokeOpacity="0.25" strokeWidth="1.5" strokeDasharray="4 4" 
           />
-          <text x="1182" y="263" fill="#60a5fa" fontSize="10" fontWeight="700">PAN-OS ZONE: Management (ethernet1/8)</text>
+          <text x="1450" y="130" fill="#60a5fa" fontSize="10" fontWeight="700">PAN-OS ZONE: Management (ethernet1/8 • Out-Of-Band)</text>
 
           {/* 2. Physical & Logical Links */}
           {topologyData?.edges?.map((edge) => {
@@ -595,29 +658,17 @@ export default function TopologyCanvas({
               strokeWidth = "2.5";
             }
 
+            const edgeRoute = getEdgePath(edge, srcCoord, dstCoord);
+
             return (
               <g key={edge.id} opacity={isEdgeDimmed ? 0.12 : 1} style={{ transition: 'opacity 0.25s ease' }}>
-                <line 
-                  x1={srcCoord.x} 
-                  y1={srcCoord.y} 
-                  x2={dstCoord.x} 
-                  y2={dstCoord.y} 
+                <path 
+                  d={edgeRoute.d}
+                  fill="none"
                   stroke={strokeColor} 
                   strokeWidth={strokeWidth} 
                   strokeDasharray={dashArray} 
                 />
-                {edge.label && (
-                  <text 
-                    x={(srcCoord.x + dstCoord.x) / 2} 
-                    y={(srcCoord.y + dstCoord.y) / 2 - 6} 
-                    fill="#94a3b8" 
-                    fontSize="10" 
-                    textAnchor="middle"
-                    className="font-mono select-none"
-                  >
-                    {edge.label}
-                  </text>
-                )}
               </g>
             );
           })}
@@ -625,57 +676,69 @@ export default function TopologyCanvas({
           {/* 3. Layer 7 App-ID Traffic Flow Animations */}
           {showTraffic && hierarchyDepth === 'all' && (
             <>
-              {/* Traffic Flow 1: Inbound Web */}
+              {/* Traffic Flow 1: Inbound Web (Internet -> DMZ Web) */}
               <path 
-                d="M 140 170 Q 420 180 700 300" 
+                d="M 175 190 C 380 145, 680 145, 875 185" 
                 fill="none" 
                 stroke="#10b981" 
                 strokeWidth="2.5" 
                 className="animate-traffic"
                 markerEnd="url(#arrow-green)"
               />
-              <text x="320" y="170" fill="#34d399" fontSize="10" fontWeight="700" className="font-mono">
-                App-ID: ssl / web-browsing [Allow-Inbound-Web]
-              </text>
+              <g transform="translate(530, 140)">
+                <rect x="-140" y="-10" width="280" height="20" rx="6" fill="#020617" stroke="#10b981" strokeWidth="1" strokeOpacity="0.8" />
+                <text x="0" y="3.5" textAnchor="middle" fill="#34d399" fontSize="10" fontWeight="700" className="font-mono">
+                  App-ID: ssl / web-browsing [Allow-Inbound-Web]
+                </text>
+              </g>
 
-              {/* Traffic Flow 2: App-ID web-browsing */}
+              {/* Traffic Flow 2: App-ID web-browsing (DMZ Web -> Trust App) */}
               <path 
-                d="M 700 300 Q 840 230 990 270" 
+                d="M 1035 185 L 1255 185" 
                 fill="none" 
                 stroke="#06b6d4" 
                 strokeWidth="2.5" 
                 className="animate-traffic"
               />
-              <text x="790" y="235" fill="#22d3ee" fontSize="10" fontWeight="700" className="font-mono">
-                App-ID: web-browsing [Allow-DMZ-to-App]
-              </text>
+              <g transform="translate(1145, 160)">
+                <rect x="-130" y="-10" width="260" height="20" rx="6" fill="#020617" stroke="#06b6d4" strokeWidth="1" strokeOpacity="0.8" />
+                <text x="0" y="3.5" textAnchor="middle" fill="#22d3ee" fontSize="10" fontWeight="700" className="font-mono">
+                  App-ID: web-browsing [Allow-DMZ-to-App]
+                </text>
+              </g>
 
-              {/* Traffic Flow 3: App-ID postgresql */}
+              {/* Traffic Flow 3: App-ID postgresql (Trust App -> Trust DB) */}
               <path 
-                d="M 990 270 L 990 370" 
+                d="M 1335 222 L 1335 278" 
                 fill="none" 
                 stroke="#818cf8" 
                 strokeWidth="2.5" 
                 className="animate-traffic"
               />
-              <text x="1005" y="325" fill="#a5b4fc" fontSize="10" fontWeight="700" className="font-mono">
-                App-ID: postgresql [Allow-App-to-DB]
-              </text>
+              <g transform="translate(1335, 250)">
+                <rect x="-115" y="-10" width="230" height="20" rx="6" fill="#020617" stroke="#818cf8" strokeWidth="1" strokeOpacity="0.8" />
+                <text x="0" y="3.5" textAnchor="middle" fill="#a5b4fc" fontSize="10" fontWeight="700" className="font-mono">
+                  App-ID: postgresql [Allow-App-to-DB]
+                </text>
+              </g>
 
-              {/* Traffic Flow 4: App-ID ssl to PCI (V2 or Diff) */}
+              {/* Traffic Flow 4: App-ID ssl to PCI (DMZ Web -> Payment Gateway) */}
               {(revision === 'v2' || revision === 'diff') && (
                 <g>
                   <path 
-                    d="M 700 300 Q 820 480 990 620" 
+                    d="M 1035 185 C 1140 240, 1200 400, 1255 470" 
                     fill="none" 
                     stroke="#a855f7" 
                     strokeWidth="3" 
                     className="animate-traffic"
                     markerEnd="url(#arrow-purple)"
                   />
-                  <text x="790" y="475" fill="#c084fc" fontSize="10" fontWeight="700" className="font-mono">
-                    App-ID: ssl [Allow-DMZ-to-Payment-GW]
-                  </text>
+                  <g transform="translate(1140, 350)">
+                    <rect x="-135" y="-10" width="270" height="20" rx="6" fill="#020617" stroke="#a855f7" strokeWidth="1" strokeOpacity="0.8" />
+                    <text x="0" y="3.5" textAnchor="middle" fill="#c084fc" fontSize="10" fontWeight="700" className="font-mono">
+                      App-ID: ssl [Allow-DMZ-to-Payment-GW]
+                    </text>
+                  </g>
                 </g>
               )}
             </>
@@ -692,12 +755,15 @@ export default function TopologyCanvas({
             const isFw = node.type === 'firewall';
             const isVR = node.type === 'virtual_router';
             const isSubnet = node.type === 'subnet';
-            const isEndpoint = node.type === 'endpoint';
             const isDiffAdded = node.diff_status === 'added';
             const isDiffRemoved = node.diff_status === 'removed';
 
-            let w = isFw ? 230 : isVR ? 180 : isSubnet ? 165 : 170;
-            let h = isFw ? 96 : isVR ? 56 : isSubnet ? 64 : 64;
+            let w = isFw ? 230 : isVR ? 200 : isSubnet ? 145 : 175;
+            let h = isFw ? 96 : isVR ? 74 : 74;
+
+            const displayName = isSubnet
+              ? (node.label?.split('\n')[0] || '').replace(' Subnet', '')
+              : (node.label?.split('\n')[0] || '');
 
             const isDimmed = (connectedNodeIds && !connectedNodeIds.has(node.id)) ||
                              (matchingNodeIds && !matchingNodeIds.has(node.id)) ||
@@ -715,45 +781,96 @@ export default function TopologyCanvas({
               >
                 <div
                   onClick={() => onSelectNode(node)}
-                  className={`rounded-2xl p-2.5 flex items-center space-x-3 ${getNodeClasses(node)}`}
+                  className={`w-full h-full rounded-xl p-2 flex items-center space-x-2.5 box-border overflow-hidden ${getNodeClasses(node)}`}
                 >
-                  <div className={`p-2 rounded-xl flex items-center justify-center ${
+                  <div className={`p-1.5 rounded-lg flex-shrink-0 flex items-center justify-center ${
                     isFw ? 'bg-[#fa582d]/20 text-[#fa582d]' : isVR ? 'bg-amber-500/20 text-amber-400' : 'bg-slate-800 text-slate-300'
                   }`}>
                     {getNodeIcon(node)}
                   </div>
 
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-slate-100 truncate block">
-                        {node.label?.split('\n')[0]}
+                  <div className="flex-1 min-w-0 pr-1">
+                    <div className="flex items-center justify-between gap-1">
+                      <span 
+                        className="text-[11.5px] font-bold text-slate-100 truncate block tracking-tight"
+                        title={displayName}
+                      >
+                        {displayName}
                       </span>
                       {isDiffAdded && (
-                        <span className="text-[9px] font-bold text-emerald-400 bg-emerald-950 px-1 py-0.2 rounded border border-emerald-800">
+                        <span className="text-[9px] font-bold text-emerald-400 bg-emerald-950 px-1 py-0.2 rounded border border-emerald-800 flex-shrink-0">
                           + ADD
                         </span>
                       )}
                       {isDiffRemoved && (
-                        <span className="text-[9px] font-bold text-rose-400 bg-rose-950 px-1 py-0.2 rounded border border-rose-800">
+                        <span className="text-[9px] font-bold text-rose-400 bg-rose-950 px-1 py-0.2 rounded border border-rose-800 flex-shrink-0">
                           - DEL
                         </span>
                       )}
                     </div>
 
-                    <div className="text-[11px] font-mono text-slate-400 mt-0.5 truncate">
+                    <div className="text-[10.5px] font-mono text-slate-400 truncate mt-0.5">
                       {isFw ? 'PAN-OS 11.1 • PA-3410' :
                        isVR ? 'Virtual Router (FIB)' :
                        node.metadata?.ip || node.metadata?.cidr || (node.label?.split('\n')[1] || '')}
                     </div>
 
                     {node.zone && (
-                      <span className="inline-block mt-1 text-[9px] font-bold px-1.5 py-0.2 rounded bg-slate-800/80 text-cyan-300 border border-slate-700 font-mono">
+                      <span className="inline-block mt-0.5 text-[8.5px] font-bold px-1.5 py-0.2 rounded bg-slate-800/80 text-cyan-300 border border-slate-700/80 font-mono truncate max-w-full">
                         Zone: {node.zone}
                       </span>
                     )}
                   </div>
                 </div>
               </foreignObject>
+            );
+          })}
+
+          {/* 5. Render Edge Label Badges on Top of Links & Nodes */}
+          {topologyData?.edges?.map((edge) => {
+            const srcCoord = layoutCoords[edge.source];
+            const dstCoord = layoutCoords[edge.target];
+            if (!srcCoord || !dstCoord) return null;
+            if (revision === 'v2' && (edge.source?.includes('Legacy') || edge.target?.includes('Legacy'))) return null;
+            if (revision === 'v1' && (edge.source?.includes('PCI') || edge.target?.includes('PCI'))) return null;
+
+            if (!edge.label || edge.label.trim() === '') return null;
+
+            const isEdgeDimmed = (connectedNodeIds && (!connectedNodeIds.has(edge.source) || !connectedNodeIds.has(edge.target))) ||
+                                 (matchingNodeIds && !matchingNodeIds.has(edge.source) && !matchingNodeIds.has(edge.target)) ||
+                                 (hierarchyDepth !== 'all' && (edge.source.includes('host') || edge.target.includes('host') || edge.source.includes('vpn-to') || edge.target.includes('vpn-to')));
+
+            const edgeRoute = getEdgePath(edge, srcCoord, dstCoord);
+
+            return (
+              <g 
+                key={`badge-${edge.id}`} 
+                transform={`translate(${edgeRoute.labelX}, ${edgeRoute.labelY})`}
+                opacity={isEdgeDimmed ? 0.12 : 1}
+                style={{ transition: 'opacity 0.25s ease' }}
+              >
+                <rect 
+                  x={-Math.max(edge.label.length * 3.4 + 10, 24)} 
+                  y="-9" 
+                  width={Math.max(edge.label.length * 6.8 + 20, 48)} 
+                  height="18" 
+                  rx="5" 
+                  fill="#090d16" 
+                  stroke="#1e293b" 
+                  strokeWidth="1" 
+                />
+                <text 
+                  x="0" 
+                  y="3.5" 
+                  fill="#94a3b8" 
+                  fontSize="9" 
+                  fontWeight="600"
+                  textAnchor="middle"
+                  className="font-mono select-none"
+                >
+                  {edge.label}
+                </text>
+              </g>
             );
           })}
         </svg>
