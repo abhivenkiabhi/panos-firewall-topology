@@ -30,13 +30,55 @@ export default function TopologyCanvas({
   simulationResult,
   onClearSimulation
 }) {
-  const [zoom, setZoom] = useState(0.80);
-  const [pan, setPan] = useState({ x: 30, y: 70 });
+  const containerRef = React.useRef(null);
+
+  const getViewportFit = () => {
+    const width = containerRef.current?.clientWidth || (typeof window !== 'undefined' ? window.innerWidth : 1920);
+    const height = containerRef.current?.clientHeight || (typeof window !== 'undefined' ? (window.innerHeight - 64) : 1000);
+
+    const contentWidth = 1820;
+    const contentHeight = 680;
+
+    // Available width/height leaving balanced margins
+    const availableWidth = Math.max(width - 80, 400);
+    const availableHeight = Math.max(height - 130, 300);
+
+    const scaleX = availableWidth / contentWidth;
+    const scaleY = availableHeight / contentHeight;
+    const fitZoom = Math.min(Math.max(Math.min(scaleX, scaleY), 0.55), 1.25);
+    const roundedZoom = Number(fitZoom.toFixed(2));
+
+    const panX = Math.round((width - contentWidth * roundedZoom) / 2);
+    const verticalSlack = Math.max(0, height - 120 - contentHeight * roundedZoom);
+    const panY = Math.round(75 + verticalSlack / 2 - 40 * roundedZoom);
+
+    return {
+      zoom: roundedZoom,
+      pan: { x: Math.max(panX, 20), y: Math.max(panY, 65) }
+    };
+  };
+
+  const [zoom, setZoom] = useState(() => getViewportFit().zoom);
+  const [pan, setPan] = useState(() => getViewportFit().pan);
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [searchQuery, setSearchQuery] = useState('');
   const [blastRadiusActive, setBlastRadiusActive] = useState(false);
   const [hierarchyDepth, setHierarchyDepth] = useState('all'); // 'all' | 'zones' | 'subnets'
+
+  // Auto-center & fit on mount and window resize
+  React.useEffect(() => {
+    const handleResize = () => {
+      const fit = getViewportFit();
+      setZoom(fit.zoom);
+      setPan(fit.pan);
+    };
+
+    handleResize();
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // 5-Tier Hierarchical layout coordinates for PAN-OS architecture (spacious & non-overlapping)
   const layoutCoords = {
@@ -119,10 +161,11 @@ export default function TopologyCanvas({
   };
 
   const handleMouseDown = (e) => {
-    if (e.target.tagName === 'svg' || e.target.id === 'canvas-bg') {
-      setIsDragging(true);
-      setDragStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
+    if (e.target.closest('button') || e.target.closest('input') || e.target.closest('.node-card')) {
+      return;
     }
+    setIsDragging(true);
+    setDragStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
   };
 
   const handleMouseMove = (e) => {
@@ -285,6 +328,7 @@ export default function TopologyCanvas({
 
   return (
     <div 
+      ref={containerRef}
       className="relative w-full h-[calc(100vh-64px)] bg-[#070b14] overflow-hidden select-none"
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
@@ -301,8 +345,8 @@ export default function TopologyCanvas({
       </svg>
 
       {/* Top Floating Controls: Search, Blast Radius, & Hierarchy Depth */}
-      <div className="absolute top-4 left-6 z-20 flex flex-col space-y-2">
-        <div className="flex items-center space-x-3 bg-slate-900/95 border border-slate-800 p-2 rounded-2xl shadow-2xl backdrop-blur">
+      <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center space-y-2 pointer-events-none">
+        <div className="flex items-center space-x-3 bg-slate-900/95 border border-slate-800 p-2 rounded-2xl shadow-2xl backdrop-blur pointer-events-auto">
           {/* Instant Search Bar */}
           <div className="flex items-center space-x-2 px-2.5 py-1.5 bg-slate-950/70 border border-slate-800 rounded-xl">
             <Search className="w-4 h-4 text-slate-400" />
@@ -383,7 +427,7 @@ export default function TopologyCanvas({
 
         {/* Hierarchical Breadcrumb Trail */}
         {breadcrumbs && (
-          <div className="flex items-center space-x-1.5 px-3 py-1.5 bg-slate-900/90 border border-slate-800/90 rounded-xl shadow-lg backdrop-blur w-fit animate-in fade-in duration-200">
+          <div className="flex items-center space-x-1.5 px-3 py-1.5 bg-slate-900/90 border border-slate-800/90 rounded-xl shadow-lg backdrop-blur w-fit animate-in fade-in duration-200 pointer-events-auto">
             <span className="text-[10px] text-slate-500 uppercase tracking-wider font-bold mr-1">Hierarchy:</span>
             {breadcrumbs.map((crumb, idx) => (
               <React.Fragment key={idx}>
@@ -426,9 +470,13 @@ export default function TopologyCanvas({
           <ZoomOut className="w-4 h-4" />
         </button>
         <button 
-          onClick={() => { setZoom(0.80); setPan({ x: 30, y: 70 }); }}
+          onClick={() => { 
+            const fit = getViewportFit();
+            setZoom(fit.zoom);
+            setPan(fit.pan);
+          }}
           className="p-2 rounded-lg hover:bg-slate-800 text-slate-300 hover:text-white"
-          title="Reset View"
+          title="Fit & Center View"
         >
           <Maximize2 className="w-4 h-4" />
         </button>
@@ -489,14 +537,7 @@ export default function TopologyCanvas({
         id="canvas-bg"
         className="w-full h-full cursor-grab active:cursor-grabbing"
       >
-        <svg 
-          className="w-full h-full"
-          style={{
-            transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-            transformOrigin: '0 0',
-            transition: isDragging ? 'none' : 'transform 0.1s ease-out'
-          }}
-        >
+        <svg className="w-full h-full overflow-hidden select-none">
           <defs>
             <linearGradient id="flow-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
               <stop offset="0%" stopColor="#fa582d" stopOpacity="0.8" />
@@ -513,6 +554,14 @@ export default function TopologyCanvas({
             </marker>
           </defs>
 
+          {/* Master Scaled & Translated Topology Group */}
+          <g 
+            transform={`translate(${pan.x}, ${pan.y}) scale(${zoom})`}
+            style={{
+              transition: isDragging ? 'none' : 'transform 0.1s ease-out',
+              transformOrigin: '0 0'
+            }}
+          >
           {/* 5-Tier Vertical Column Dividers */}
           <line x1="385" y1="40" x2="385" y2="720" stroke="#1e293b" strokeWidth="1" strokeDasharray="4 4" />
           <line x1="675" y1="40" x2="675" y2="720" stroke="#1e293b" strokeWidth="1" strokeDasharray="4 4" />
@@ -781,7 +830,7 @@ export default function TopologyCanvas({
               >
                 <div
                   onClick={() => onSelectNode(node)}
-                  className={`w-full h-full rounded-xl p-2 flex items-center space-x-2.5 box-border overflow-hidden ${getNodeClasses(node)}`}
+                  className={`node-card w-full h-full rounded-xl p-2 flex items-center space-x-2.5 box-border overflow-hidden ${getNodeClasses(node)}`}
                 >
                   <div className={`p-1.5 rounded-lg flex-shrink-0 flex items-center justify-center ${
                     isFw ? 'bg-[#fa582d]/20 text-[#fa582d]' : isVR ? 'bg-amber-500/20 text-amber-400' : 'bg-slate-800 text-slate-300'
@@ -873,6 +922,7 @@ export default function TopologyCanvas({
               </g>
             );
           })}
+          </g>
         </svg>
       </div>
     </div>
